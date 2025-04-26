@@ -2,6 +2,7 @@
 require_once '../includes/header.php';
 require_once '../api/fakestore.php';
 require_once '../config/database.php';
+require_once '../includes/Cart.php';
 
 // Get product ID from URL
 $product_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
@@ -39,6 +40,22 @@ if ($product['category']) {
     });
     // Limit to 4 related products
     $related_products = array_slice($related_products, 0, 4);
+}
+
+// Handle add to cart
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
+    if (!isLoggedIn()) {
+        header('Location: login.php');
+        exit();
+    }
+    
+    $quantity = $_POST['quantity'] ?? 1;
+    $cart = new Cart();
+    $cart->addToCart($_SESSION['user_id'], $product_id, $quantity);
+    
+    // Redirect to cart page
+    header('Location: cart.php');
+    exit();
 }
 ?>
 
@@ -445,13 +462,13 @@ if ($product['category']) {
 
                         <p class="product-description"><?php echo htmlspecialchars($product['description']); ?></p>
 
-                        <form id="addToCartForm">
+                        <form id="addToCartForm" method="POST">
                             <div class="quantity-selector">
                                 <label for="quantity">Quantity:</label>
                                 <input type="number" id="quantity" name="quantity" class="quantity-input" value="1" min="1" max="10">
                             </div>
                             <div class="product-actions">
-                                <button type="submit" class="btn-add-cart">
+                                <button type="submit" name="add_to_cart" class="btn-add-cart">
                                     <i class="fas fa-shopping-cart"></i>
                                     Add to Cart
                                 </button>

@@ -1,12 +1,6 @@
 <?php
 require_once '../includes/header.php';
 
-// Check if user is already logged in
-if (isset($_SESSION['user_id'])) {
-    header('Location: home.php');
-    exit();
-}
-
 // Handle login form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = $_POST['email'] ?? '';

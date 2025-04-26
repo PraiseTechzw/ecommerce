@@ -308,20 +308,25 @@ if (isset($_SESSION['user_id']) && basename($_SERVER['PHP_SELF']) === 'login.php
             </nav>
 
             <div class="user-status">
-                <?php if (isLoggedIn() && isset($_SESSION['username'])): ?>
-                    <span class="welcome-text">Welcome, <?php echo htmlspecialchars($_SESSION['username']); ?></span>
+                <?php if (isLoggedIn()): ?>
+                    <div class="user-welcome">
+                        <span class="welcome-text">Welcome, <strong><?php echo htmlspecialchars($_SESSION['user_name']); ?></strong></span>
+                    </div>
                     <a href="<?php echo BASE_URL; ?>/pages/cart.php" class="cart-icon">
                         <i class="fas fa-shopping-cart"></i>
-                        <span class="cart-count" id="headerCartCount"><?php echo getCartCount(); ?></span>
+                        <span class="cart-count" id="headerCartCount">
+                            <?php 
+                            require_once __DIR__ . '/Cart.php';
+                            $cart = new Cart();
+                            echo $cart->getCartCount($_SESSION['user_id']);
+                            ?>
+                        </span>
                     </a>
-                    <div class="auth-buttons">
-                        <a href="<?php echo BASE_URL; ?>/pages/profile.php" class="btn-login">Profile</a>
-                        <a href="<?php echo BASE_URL; ?>/pages/logout.php" class="btn-register">Logout</a>
-                    </div>
+                    <a href="<?php echo BASE_URL; ?>/pages/logout.php" class="btn btn-outline-light">Logout</a>
                 <?php else: ?>
                     <div class="auth-buttons">
-                        <a href="<?php echo BASE_URL; ?>/pages/login.php" class="btn-login">Login</a>
-                        <a href="<?php echo BASE_URL; ?>/pages/register.php" class="btn-register">Register</a>
+                        <a href="<?php echo BASE_URL; ?>/pages/login.php" class="btn btn-outline-light">Login</a>
+                        <a href="<?php echo BASE_URL; ?>/pages/register.php" class="btn btn-primary">Register</a>
                     </div>
                 <?php endif; ?>
             </div>

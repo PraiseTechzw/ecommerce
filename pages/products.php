@@ -2,6 +2,7 @@
 require_once '../includes/header.php';
 require_once '../api/fakestore.php';
 require_once '../config/database.php';
+require_once '../includes/Cart.php';
 
 // Check if user is logged in (needed for cart functionality check)
 $isUserLoggedIn = isLoggedIn();
@@ -83,6 +84,24 @@ switch ($sort_by) {
             return strtotime($b['created_at'] ?? 'now') <=> strtotime($a['created_at'] ?? 'now');
         });
         break;
+}
+
+// Handle add to cart
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
+    if (!isLoggedIn()) {
+        header('Location: login.php');
+        exit();
+    }
+    
+    $productId = $_POST['product_id'];
+    $quantity = $_POST['quantity'] ?? 1;
+    
+    $cart = new Cart();
+    $cart->addToCart($_SESSION['user_id'], $productId, $quantity);
+    
+    // Redirect to prevent form resubmission
+    header('Location: products.php' . ($selected_category ? "?category=$selected_category" : '') . ($search_query ? "&search=$search_query" : ''));
+    exit();
 }
 ?>
 
@@ -684,9 +703,14 @@ switch ($sort_by) {
                             <div class="product-actions">
                                 <button class="btn-view-details" onclick="quickView(<?php echo htmlspecialchars(json_encode($product)); ?>)">Quick View</button>
                                 <?php if ($stock > 0): ?>
-                                    <button class="btn-add-cart" onclick="addToCart(<?php echo $product['id']; ?>)">
-                                        <i class="fas fa-shopping-cart"></i>
-                                    </button>
+                                    <form method="POST" class="d-flex align-items-center">
+                                        <input type="hidden" name="product_id" value="<?php echo $product['id']; ?>">
+                                        <input type="number" name="quantity" value="1" min="1" max="99" 
+                                               class="form-control me-2" style="width: 70px;">
+                                        <button type="submit" name="add_to_cart" class="btn btn-primary">
+                                            <i class="fas fa-shopping-cart"></i> Add to Cart
+                                        </button>
+                                    </form>
                                 <?php endif; ?>
                             </div>
                         </div>
