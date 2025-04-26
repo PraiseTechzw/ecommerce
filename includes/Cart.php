@@ -1,11 +1,14 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../api/fakestore.php';
 
 class Cart {
     private $db;
+    private $api;
 
     public function __construct() {
         $this->db = new Database();
+        $this->api = new FakeStoreAPI();
     }
 
     public function addToCart($userId, $productId, $quantity = 1) {
@@ -52,27 +55,56 @@ class Cart {
 
     public function getCartItems($userId) {
         $conn = $this->db->getConnection();
-        $stmt = $conn->prepare("
-            SELECT c.*, p.title, p.price, p.image 
-            FROM cart c 
-            JOIN products p ON c.product_id = p.id 
-            WHERE c.user_id = ?
-        ");
+        $stmt = $conn->prepare("SELECT * FROM cart WHERE user_id = ?");
         $stmt->execute([$userId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $cartItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $items = [];
+        foreach ($cartItems as $item) {
+            // Check if product ID is from FakeStoreAPI (they use numeric IDs)
+            if (is_numeric($item['product_id'])) {
+                $product = $this->api->getProduct($item['product_id']);
+                if ($product) {
+                    $items[] = [
+                        'id' => $item['id'],
+                        'product_id' => $item['product_id'],
+                        'quantity' => $item['quantity'],
+                        'title' => $product['title'],
+                        'price' => $product['price'],
+                        'image' => $product['image']
+                    ];
+                }
+            } else {
+                // Get product from database
+                $stmt = $conn->prepare("SELECT title, price, image_url FROM products WHERE id = ?");
+                $stmt->execute([$item['product_id']]);
+                $product = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($product) {
+                    $items[] = [
+                        'id' => $item['id'],
+                        'product_id' => $item['product_id'],
+                        'quantity' => $item['quantity'],
+                        'title' => $product['title'],
+                        'price' => $product['price'],
+                        'image' => $product['image_url']
+                    ];
+                }
+            }
+        }
+        
+        return $items;
     }
 
     public function getCartTotal($userId) {
-        $conn = $this->db->getConnection();
-        $stmt = $conn->prepare("
-            SELECT SUM(p.price * c.quantity) as total 
-            FROM cart c 
-            JOIN products p ON c.product_id = p.id 
-            WHERE c.user_id = ?
-        ");
-        $stmt->execute([$userId]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $result['total'] ?? 0;
+        $items = $this->getCartItems($userId);
+        $total = 0;
+        
+        foreach ($items as $item) {
+            $total += $item['price'] * $item['quantity'];
+        }
+        
+        return $total;
     }
 
     public function getCartCount($userId) {

@@ -66,10 +66,10 @@ $cartTotal = $cart->getCartTotal($userId);
                                         <tr>
                                             <td>
                                                 <div class="d-flex align-items-center">
-                                                    <img src="<?php echo htmlspecialchars($item['image']); ?>" 
-                                                         alt="<?php echo htmlspecialchars($item['name']); ?>" 
+                                                    <img src="<?php echo htmlspecialchars($item['image'] ?? 'https://via.placeholder.com/50'); ?>" 
+                                                         alt="<?php echo htmlspecialchars($item['title']); ?>" 
                                                          class="img-thumbnail" style="width: 50px; height: 50px; object-fit: cover;">
-                                                    <span class="ms-2"><?php echo htmlspecialchars($item['name']); ?></span>
+                                                    <span class="ms-2"><?php echo htmlspecialchars($item['title']); ?></span>
                                                 </div>
                                             </td>
                                             <td>$<?php echo number_format($item['price'], 2); ?></td>
