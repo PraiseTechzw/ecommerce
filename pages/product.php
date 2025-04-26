@@ -506,11 +506,43 @@ document.getElementById('addToCartForm').addEventListener('submit', function(e) 
         method: 'POST',
         body: formData
     })
-    .then(response => response.json())
+    .then(response => {
+        if (response.status === 401) {
+            // Handle unauthorized (not logged in) case
+            return response.json().then(data => {
+                // Show login required message
+                Toastify({
+                    text: data.message || 'Please login to add items to cart',
+                    duration: 3000,
+                    gravity: "top",
+                    position: "right",
+                    backgroundColor: "linear-gradient(to right, #ff416c, #ff4b2b)",
+                    stopOnFocus: true
+                }).showToast();
+                
+                // Store the current URL to redirect back after login
+                localStorage.setItem('redirectAfterLogin', window.location.href);
+                
+                // Wait for the toast to show before redirecting
+                setTimeout(() => {
+                    window.location.href = data.redirect;
+                }, 1500);
+                
+                throw new Error('Login required');
+            });
+        }
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             // Update cart count in header
-            document.getElementById('headerCartCount').textContent = data.cart_count;
+            const cartCountElement = document.getElementById('headerCartCount');
+            if (cartCountElement) {
+                cartCountElement.textContent = data.cart_count;
+            }
             
             // Show success message
             Toastify({
@@ -531,23 +563,21 @@ document.getElementById('addToCartForm').addEventListener('submit', function(e) 
                 backgroundColor: "linear-gradient(to right, #ff416c, #ff4b2b)",
                 stopOnFocus: true
             }).showToast();
-            
-            // Redirect to login if not authenticated
-            if (data.redirect) {
-                window.location.href = data.redirect;
-            }
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        Toastify({
-            text: "An error occurred while adding to cart",
-            duration: 3000,
-            gravity: "top",
-            position: "right",
-            backgroundColor: "linear-gradient(to right, #ff416c, #ff4b2b)",
-            stopOnFocus: true
-        }).showToast();
+        // Only show error toast if not redirecting to login
+        if (error.message !== 'Login required') {
+            Toastify({
+                text: "An error occurred while adding to cart. Please try again.",
+                duration: 3000,
+                gravity: "top",
+                position: "right",
+                backgroundColor: "linear-gradient(to right, #ff416c, #ff4b2b)",
+                stopOnFocus: true
+            }).showToast();
+        }
     });
 });
 </script>

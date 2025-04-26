@@ -732,5 +732,143 @@ switch ($sort_by) {
 
 <!-- Add the script.js file -->
 <script src="/public/js/script.js"></script>
+<script>
+// Function to handle adding items to cart
+function addToCart(productId) {
+    const formData = new FormData();
+    formData.append('product_id', productId);
+    formData.append('quantity', 1); // Default quantity
+    
+    fetch('<?php echo BASE_URL; ?>/api/cart/add.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (response.status === 401) {
+            // Handle unauthorized (not logged in) case
+            return response.json().then(data => {
+                // Show login required message
+                Toastify({
+                    text: data.message || 'Please login to add items to cart',
+                    duration: 3000,
+                    gravity: "top",
+                    position: "right",
+                    backgroundColor: "linear-gradient(to right, #ff416c, #ff4b2b)",
+                    stopOnFocus: true
+                }).showToast();
+                
+                // Store the current URL to redirect back after login
+                localStorage.setItem('redirectAfterLogin', window.location.href);
+                
+                // Wait for the toast to show before redirecting
+                setTimeout(() => {
+                    window.location.href = data.redirect;
+                }, 1500);
+                
+                throw new Error('Login required');
+            });
+        }
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            // Update cart count in header
+            const cartCountElement = document.getElementById('headerCartCount');
+            if (cartCountElement) {
+                cartCountElement.textContent = data.cart_count;
+            }
+            
+            // Show success message
+            Toastify({
+                text: data.message,
+                duration: 3000,
+                gravity: "top",
+                position: "right",
+                backgroundColor: "linear-gradient(to right, #00b09b, #96c93d)",
+                stopOnFocus: true
+            }).showToast();
+        } else {
+            // Handle error
+            Toastify({
+                text: data.message || "An error occurred",
+                duration: 3000,
+                gravity: "top",
+                position: "right",
+                backgroundColor: "linear-gradient(to right, #ff416c, #ff4b2b)",
+                stopOnFocus: true
+            }).showToast();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        // Only show error toast if not redirecting to login
+        if (error.message !== 'Login required') {
+            Toastify({
+                text: "An error occurred while adding to cart. Please try again.",
+                duration: 3000,
+                gravity: "top",
+                position: "right",
+                backgroundColor: "linear-gradient(to right, #ff416c, #ff4b2b)",
+                stopOnFocus: true
+            }).showToast();
+        }
+    });
+}
+
+// Function to handle quick view
+function quickView(product) {
+    // Update modal content
+    document.getElementById('quickViewImage').src = product.image;
+    document.getElementById('quickViewTitle').textContent = product.title;
+    document.getElementById('quickViewPrice').textContent = formatPrice(product.price);
+    document.getElementById('quickViewDescription').textContent = product.description;
+    
+    // Update rating stars
+    const ratingContainer = document.getElementById('quickViewRating');
+    ratingContainer.innerHTML = '';
+    const rating = product.rating?.rate || 4.5;
+    const fullStars = Math.floor(rating);
+    const halfStar = rating - fullStars >= 0.5;
+    
+    for (let i = 0; i < 5; i++) {
+        const star = document.createElement('i');
+        if (i < fullStars) {
+            star.className = 'fas fa-star';
+        } else if (i === fullStars && halfStar) {
+            star.className = 'fas fa-star-half-alt';
+        } else {
+            star.className = 'far fa-star';
+        }
+        ratingContainer.appendChild(star);
+    }
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('quickViewModal'));
+    modal.show();
+}
+
+// Function to update quantity in quick view
+function updateQuantity(change) {
+    const input = document.getElementById('quantity');
+    const newValue = parseInt(input.value) + change;
+    if (newValue >= 1 && newValue <= 10) {
+        input.value = newValue;
+    }
+}
+
+// Function to add to cart from quick view
+function addToCartFromQuickView() {
+    const productId = document.getElementById('quickViewModal').dataset.productId;
+    const quantity = parseInt(document.getElementById('quantity').value);
+    addToCart(productId, quantity);
+    
+    // Close modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('quickViewModal'));
+    modal.hide();
+}
+</script>
 </body>
 </html> 
