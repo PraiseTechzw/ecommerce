@@ -1,9 +1,9 @@
 <?php
 return [
-    'client_id' => 'AeQoObZYOY7u2APCkjQptc',
-    'client_secret' => 'EGdE9sBRek56L6B3nCSzp-9ZJPmWFU8Bj_erbeSGUWilaHHZPZP6iS8-o7Y623Q-t-C5n_zP4xrkZXCH',
+    'client_id' => 'YOUR_PAYPAL_CLIENT_ID',
+    'client_secret' => 'YOUR_PAYPAL_CLIENT_SECRET',
     'mode' => 'sandbox', // Change to 'live' for production
     'currency' => 'USD',
-    'return_url' => 'http://localhost/ecommerce/pages/register.php?success=true',
-    'cancel_url' => 'http://localhost/ecommerce/pages/register.php?cancel=true'
+    'return_url' => 'http://localhost/ecommerce/pages/checkout-success.php',
+    'cancel_url' => 'http://localhost/ecommerce/pages/checkout.php'
 ]; 

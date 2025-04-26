@@ -1,154 +1,76 @@
 <?php
-require_once '../includes/header.php';
-require_once '../api/fakestore.php';
-require_once '../config/database.php';
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../services/PayPalService.php';
+require_once __DIR__ . '/../services/CartService.php';
 
-// Check if user is logged in
+session_start();
+
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit();
 }
 
-// Check if cart is empty
-if (empty($_SESSION['cart'])) {
-    header('Location: cart.php');
-    exit();
-}
+$cartService = new CartService($pdo);
+$paypalService = new PayPalService();
 
-$api = new FakeStoreAPI();
-$cart_items = [];
-$total = 0;
+$cart = $cartService->getCart($_SESSION['user_id']);
+$total = $cartService->calculateTotal($cart);
 
-foreach ($_SESSION['cart'] as $product_id => $quantity) {
-    $product = $api->getProduct($product_id);
-    if ($product) {
-        $product['quantity'] = $quantity;
-        $product['subtotal'] = $product['price'] * $quantity;
-        $cart_items[] = $product;
-        $total += $product['subtotal'];
-    }
-}
-
-$errors = [];
-$success = false;
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Validate form data
-    $name = trim($_POST['name'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $address = trim($_POST['address'] ?? '');
-    $city = trim($_POST['city'] ?? '');
-    $zip = trim($_POST['zip'] ?? '');
-    $card_number = trim($_POST['card_number'] ?? '');
-    $expiry = trim($_POST['expiry'] ?? '');
-    $cvv = trim($_POST['cvv'] ?? '');
-
-    if (empty($name)) $errors[] = "Name is required";
-    if (empty($email)) $errors[] = "Email is required";
-    if (empty($address)) $errors[] = "Address is required";
-    if (empty($city)) $errors[] = "City is required";
-    if (empty($zip)) $errors[] = "ZIP code is required";
-    if (empty($card_number)) $errors[] = "Card number is required";
-    if (empty($expiry)) $errors[] = "Expiry date is required";
-    if (empty($cvv)) $errors[] = "CVV is required";
-
-    if (empty($errors)) {
-        // Simulate payment processing
-        $payment_success = rand(0, 1); // 50% chance of success
-
-        if ($payment_success) {
-            // Create order in database
-            $db = new Database();
-            $conn = $db->getConnection();
-
-            $product_ids = json_encode(array_keys($_SESSION['cart']));
-            $transaction_id = uniqid('TRANS_');
-
-            $stmt = $conn->prepare("INSERT INTO orders (user_id, product_ids, total_price, payment_status, transaction_id) VALUES (?, ?, ?, 'paid', ?)");
-            $stmt->execute([$_SESSION['user_id'], $product_ids, $total, $transaction_id]);
-
-            // Clear cart
-            $_SESSION['cart'] = [];
-            $success = true;
-        } else {
-            $errors[] = "Payment failed. Please try again.";
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['paypal'])) {
+    $order = $paypalService->createOrder($cart, $total);
+    if ($order) {
+        foreach ($order->links as $link) {
+            if ($link->rel === 'approve') {
+                header('Location: ' . $link->href);
+                exit();
+            }
         }
     }
 }
 ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout - E-Commerce</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+    <?php include '../includes/header.php'; ?>
 
-<h1>Checkout</h1>
-
-<?php if ($success): ?>
-    <div class="success-message">
-        <h2>Order Successful!</h2>
-        <p>Thank you for your purchase. Your order has been placed successfully.</p>
-        <a href="home.php" class="btn">Continue Shopping</a>
-    </div>
-<?php else: ?>
-    <?php if (!empty($errors)): ?>
-        <div class="error-message">
-            <?php foreach ($errors as $error): ?>
-                <p><?php echo htmlspecialchars($error); ?></p>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
-
-    <div class="checkout-container">
-        <div class="order-summary">
+    <main class="container">
+        <h1>Checkout</h1>
+        
+        <div class="checkout-summary">
             <h2>Order Summary</h2>
-            <?php foreach ($cart_items as $item): ?>
-                <div class="checkout-item">
-                    <span><?php echo htmlspecialchars($item['title']); ?> x <?php echo $item['quantity']; ?></span>
-                    <span>$<?php echo number_format($item['subtotal'], 2); ?></span>
+            <?php foreach ($cart as $item): ?>
+                <div class="cart-item">
+                    <img src="<?php echo htmlspecialchars($item['image']); ?>" alt="<?php echo htmlspecialchars($item['title']); ?>">
+                    <div class="item-details">
+                        <h3><?php echo htmlspecialchars($item['title']); ?></h3>
+                        <p>Quantity: <?php echo $item['quantity']; ?></p>
+                        <p>Price: $<?php echo number_format($item['price'], 2); ?></p>
+                    </div>
                 </div>
             <?php endforeach; ?>
+            
             <div class="total">
-                <strong>Total:</strong>
-                <span>$<?php echo number_format($total, 2); ?></span>
+                <h3>Total: $<?php echo number_format($total, 2); ?></h3>
             </div>
         </div>
 
-        <form method="POST" action="" class="checkout-form">
-            <h2>Shipping Information</h2>
-            <div class="form-group">
-                <label for="name">Full Name</label>
-                <input type="text" id="name" name="name" required>
-            </div>
-            <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email" required>
-            </div>
-            <div class="form-group">
-                <label for="address">Address</label>
-                <input type="text" id="address" name="address" required>
-            </div>
-            <div class="form-group">
-                <label for="city">City</label>
-                <input type="text" id="city" name="city" required>
-            </div>
-            <div class="form-group">
-                <label for="zip">ZIP Code</label>
-                <input type="text" id="zip" name="zip" required>
-            </div>
+        <div class="payment-options">
+            <h2>Payment Method</h2>
+            <form method="POST">
+                <button type="submit" name="paypal" class="btn btn-primary">
+                    <img src="../assets/images/paypal.png" alt="PayPal" style="height: 24px; vertical-align: middle;">
+                    Pay with PayPal
+                </button>
+            </form>
+        </div>
+    </main>
 
-            <h2>Payment Information</h2>
-            <div class="form-group">
-                <label for="card_number">Card Number</label>
-                <input type="text" id="card_number" name="card_number" required>
-            </div>
-            <div class="form-group">
-                <label for="expiry">Expiry Date (MM/YY)</label>
-                <input type="text" id="expiry" name="expiry" required>
-            </div>
-            <div class="form-group">
-                <label for="cvv">CVV</label>
-                <input type="text" id="cvv" name="cvv" required>
-            </div>
-
-            <button type="submit" class="btn">Place Order</button>
-        </form>
-    </div>
-<?php endif; ?>
-
-<?php require_once '../includes/footer.php'; ?> 
+    <?php include '../includes/footer.php'; ?>
+</body>
+</html> 
