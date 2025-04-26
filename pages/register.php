@@ -1,14 +1,29 @@
 <?php
 require_once '../includes/header.php';
 require_once '../config/database.php';
+require_once '../includes/PayPalService.php';
 
 $errors = [];
+$success_message = '';
+
+// Handle PayPal return
+if (isset($_GET['success']) && $_GET['success'] == 'true' && isset($_GET['token'])) {
+    $paypal = new PayPalService();
+    $response = $paypal->captureOrder($_GET['token']);
+    
+    if ($response && $response->result->status == 'COMPLETED') {
+        $success_message = "Payment successful! Your account has been created.";
+    } else {
+        $errors[] = "Payment failed. Please try again.";
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
     $confirm_password = $_POST['confirm_password'] ?? '';
+    $payment_method = $_POST['payment_method'] ?? '';
 
     // Enhanced validation
     if (empty($name)) $errors[] = "Name is required";
@@ -19,30 +34,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!preg_match("/[A-Z]/", $password)) $errors[] = "Password must contain at least one uppercase letter";
     if (!preg_match("/[0-9]/", $password)) $errors[] = "Password must contain at least one number";
     if ($password !== $confirm_password) $errors[] = "Passwords do not match";
+    if (empty($payment_method)) $errors[] = "Please select a payment method";
 
     if (empty($errors)) {
-        $db = new Database();
-        $conn = $db->getConnection();
-
-        // Check if email already exists
-        $stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
-        $stmt->execute([$email]);
-        if ($stmt->fetch()) {
-            $errors[] = "Email already registered";
+        if ($payment_method === 'paypal') {
+            $paypal = new PayPalService();
+            $response = $paypal->createOrder('10.00', 'Premium Account Registration');
+            
+            if ($response && isset($response->result->links)) {
+                foreach ($response->result->links as $link) {
+                    if ($link->rel === 'approve') {
+                        header('Location: ' . $link->href);
+                        exit();
+                    }
+                }
+            }
+            $errors[] = "Failed to create PayPal order. Please try again.";
         } else {
-            // Create new user
-            $password_hash = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $conn->prepare("INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)");
-            $stmt->execute([$name, $email, $password_hash]);
+            // Handle other payment methods here
+            $db = new Database();
+            $conn = $db->getConnection();
 
-            // Log in the new user
-            $_SESSION['user_id'] = $conn->lastInsertId();
-            $_SESSION['user_name'] = $name;
-            $_SESSION['user_email'] = $email;
-            $_SESSION['role'] = 'user';
+            // Check if email already exists
+            $stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
+            $stmt->execute([$email]);
+            if ($stmt->fetch()) {
+                $errors[] = "Email already registered";
+            } else {
+                // Create new user
+                $password_hash = password_hash($password, PASSWORD_DEFAULT);
+                $stmt = $conn->prepare("INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)");
+                $stmt->execute([$name, $email, $password_hash]);
 
-            header('Location: home.php');
-            exit();
+                // Log in the new user
+                $_SESSION['user_id'] = $conn->lastInsertId();
+                $_SESSION['user_name'] = $name;
+                $_SESSION['user_email'] = $email;
+                $_SESSION['role'] = 'user';
+
+                header('Location: home.php');
+                exit();
+            }
         }
     }
 }
@@ -61,6 +93,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php foreach ($errors as $error): ?>
                 <p><?php echo htmlspecialchars($error); ?></p>
             <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+
+    <?php if (!empty($success_message)): ?>
+        <div class="success-message">
+            <p><?php echo htmlspecialchars($success_message); ?></p>
         </div>
     <?php endif; ?>
 
@@ -86,6 +124,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="form-group">
             <label for="confirm_password">Confirm Password</label>
             <input type="password" id="confirm_password" name="confirm_password" required>
+        </div>
+
+        <div class="form-group">
+            <label>Payment Method</label>
+            <div class="payment-methods">
+                <label class="payment-method">
+                    <input type="radio" name="payment_method" value="paypal" required>
+                    <img src="https://www.paypalobjects.com/webstatic/mktg/logo/pp_cc_mark_37x23.jpg" alt="PayPal">
+                    <span>PayPal</span>
+                </label>
+            </div>
         </div>
         
         <button type="submit" class="btn">Create Account</button>

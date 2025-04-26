@@ -409,181 +409,85 @@ if ($product['category']) {
     <div class="container">
         <div class="product-container">
             <div class="row">
-                <!-- Product Gallery -->
                 <div class="col-md-6">
                     <div class="product-gallery">
-                        <img src="<?php echo htmlspecialchars($product['image_url'] ?? $product['image']); ?>" 
-                             alt="<?php echo htmlspecialchars($product['title']); ?>"
-                             class="main-image"
-                             id="mainImage">
-                        <div class="thumbnail-container">
-                            <img src="<?php echo htmlspecialchars($product['image_url'] ?? $product['image']); ?>" 
-                                 alt="Thumbnail"
-                                 class="thumbnail active"
-                                 onclick="changeImage(this.src)">
-                            <?php if (isset($product['images']) && is_array($product['images'])): ?>
-                                <?php foreach ($product['images'] as $image): ?>
-                                    <img src="<?php echo htmlspecialchars($image); ?>" 
-                                         alt="Thumbnail"
-                                         class="thumbnail"
-                                         onclick="changeImage(this.src)">
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </div>
+                        <img src="<?php echo htmlspecialchars($product['image'] ?? $product['image_url']); ?>" 
+                             alt="<?php echo htmlspecialchars($product['title']); ?>" 
+                             class="main-image">
                     </div>
-    </div>
-    
-                <!-- Product Info -->
+                </div>
                 <div class="col-md-6">
-    <div class="product-info">
-                        <div class="product-category">
-                            <?php echo htmlspecialchars(ucfirst($product['category'])); ?>
-                        </div>
+                    <div class="product-info">
+                        <span class="product-category"><?php echo htmlspecialchars($product['category']); ?></span>
                         <h1 class="product-title"><?php echo htmlspecialchars($product['title']); ?></h1>
+                        <div class="product-price"><?php echo formatPrice($product['price']); ?></div>
                         
-                        <?php
-                        $stock = $product['stock'] ?? 100;
-                        $stockClass = $stock > 20 ? 'in-stock' : ($stock > 0 ? 'low-stock' : 'out-of-stock');
-                        $stockText = $stock > 20 ? 'In Stock' : ($stock > 0 ? 'Low Stock' : 'Out of Stock');
-                        ?>
-                        <div class="stock-status <?php echo $stockClass; ?>">
-                            <?php echo $stockText; ?>
-                        </div>
-
-                        <div class="product-price">
-                            <?php echo formatPrice($product['price']); ?>
-                        </div>
-
                         <div class="product-rating">
                             <div class="rating-stars">
                                 <?php
                                 $rating = isset($product['rating']['rate']) ? $product['rating']['rate'] : 4.5;
-                                $fullStars = floor($rating);
-                                $hasHalfStar = $rating - $fullStars >= 0.5;
+                                $full_stars = floor($rating);
+                                $half_star = $rating - $full_stars >= 0.5;
                                 
-                                for ($i = 0; $i < $fullStars; $i++) {
-                                    echo '<i class="fas fa-star"></i>';
-                                }
-                                if ($hasHalfStar) {
-                                    echo '<i class="fas fa-star-half-alt"></i>';
-                                }
-                                $emptyStars = 5 - ceil($rating);
-                                for ($i = 0; $i < $emptyStars; $i++) {
-                                    echo '<i class="far fa-star"></i>';
+                                for ($i = 0; $i < 5; $i++) {
+                                    if ($i < $full_stars) {
+                                        echo '<i class="fas fa-star"></i>';
+                                    } elseif ($i == $full_stars && $half_star) {
+                                        echo '<i class="fas fa-star-half-alt"></i>';
+                                    } else {
+                                        echo '<i class="far fa-star"></i>';
+                                    }
                                 }
                                 ?>
                             </div>
-                            <span class="rating-count">
-                                (<?php echo isset($product['rating']['count']) ? $product['rating']['count'] : rand(10, 100); ?> reviews)
-                            </span>
+                            <span class="rating-count">(<?php echo isset($product['rating']['count']) ? $product['rating']['count'] : '0'; ?>)</span>
                         </div>
 
-                        <div class="product-description">
-                            <?php echo htmlspecialchars($product['description']); ?>
-                        </div>
+                        <p class="product-description"><?php echo htmlspecialchars($product['description']); ?></p>
 
-                        <div class="product-meta">
-                            <div class="meta-item">
-                                <i class="fas fa-truck meta-icon"></i>
-                                <span class="meta-text">Free Shipping</span>
+                        <form id="addToCartForm">
+                            <div class="quantity-selector">
+                                <label for="quantity">Quantity:</label>
+                                <input type="number" id="quantity" name="quantity" class="quantity-input" value="1" min="1" max="10">
                             </div>
-                            <div class="meta-item">
-                                <i class="fas fa-undo meta-icon"></i>
-                                <span class="meta-text">30-Day Returns</span>
+                            <div class="product-actions">
+                                <button type="submit" class="btn-add-cart">
+                                    <i class="fas fa-shopping-cart"></i>
+                                    Add to Cart
+                                </button>
+                                <button type="button" class="btn-wishlist">
+                                    <i class="far fa-heart"></i>
+                                </button>
                             </div>
-                            <div class="meta-item">
-                                <i class="fas fa-shield-alt meta-icon"></i>
-                                <span class="meta-text">2-Year Warranty</span>
-                            </div>
-                        </div>
-
-                        <div class="quantity-selector">
-                            <button class="quantity-btn" onclick="updateQuantity(-1)">-</button>
-                            <input type="number" class="quantity-input" id="quantity" value="1" min="1">
-                            <button class="quantity-btn" onclick="updateQuantity(1)">+</button>
-                        </div>
-
-                        <div class="product-actions">
-                            <button class="btn-add-cart" onclick="addToCart(<?php echo $product['id']; ?>)">
-                                <i class="fas fa-shopping-cart"></i>
-                                Add to Cart
-                            </button>
-                            <button class="btn-wishlist" onclick="addToWishlist(<?php echo $product['id']; ?>)">
-                                <i class="far fa-heart"></i>
-                            </button>
-                        </div>
-
-                        <div class="product-features">
-                            <div class="features-grid">
-                                <div class="feature-item">
-                                    <div class="feature-icon">
-                                        <i class="fas fa-check"></i>
-                                    </div>
-                                    <div class="feature-text">Premium Quality</div>
-                                </div>
-                                <div class="feature-item">
-                                    <div class="feature-icon">
-                                        <i class="fas fa-sync"></i>
-                                    </div>
-                                    <div class="feature-text">Easy Returns</div>
-                                </div>
-                                <div class="feature-item">
-                                    <div class="feature-icon">
-                                        <i class="fas fa-truck"></i>
-                                    </div>
-                                    <div class="feature-text">Fast Delivery</div>
-                                </div>
-                                <div class="feature-item">
-                                    <div class="feature-icon">
-                                        <i class="fas fa-headset"></i>
-                                    </div>
-                                    <div class="feature-text">24/7 Support</div>
-                                </div>
-                            </div>
-                        </div>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Reviews Section -->
-        <div class="reviews-section">
-            <h2 class="related-title">Customer Reviews</h2>
-            <div class="review-card">
-                <div class="review-header">
-                    <div class="reviewer-name">John Doe</div>
-                    <div class="review-date">March 15, 2024</div>
-                </div>
-                <div class="review-rating">
-                    <i class="fas fa-star"></i>
-                    <i class="fas fa-star"></i>
-                    <i class="fas fa-star"></i>
-                    <i class="fas fa-star"></i>
-                    <i class="fas fa-star"></i>
-                </div>
-                <div class="review-text">
-                    Excellent product! The quality is outstanding and it exceeded my expectations. 
-                    The delivery was fast and the packaging was secure. Highly recommended!
-                </div>
-            </div>
-            <!-- Add more review cards as needed -->
-        </div>
-
-        <!-- Related Products -->
         <?php if (!empty($related_products)): ?>
-        <div class="related-products">
-            <h2 class="related-title">You May Also Like</h2>
-            <div class="related-grid">
+        <div class="related-products mt-5">
+            <h2 class="text-center mb-4">Related Products</h2>
+            <div class="row">
                 <?php foreach ($related_products as $related): ?>
-                    <div class="related-card">
-                        <img src="<?php echo htmlspecialchars($related['image_url'] ?? $related['image']); ?>" 
-                             alt="<?php echo htmlspecialchars($related['title']); ?>"
-                             class="related-image">
-                        <div class="related-info">
-                            <h3 class="related-name"><?php echo htmlspecialchars($related['title']); ?></h3>
-                            <p class="related-price"><?php echo formatPrice($related['price']); ?></p>
+                <div class="col-md-3">
+                    <div class="product-card">
+                        <a href="<?php echo BASE_URL; ?>/pages/product.php?id=<?php echo $related['id']; ?>" class="product-image-container">
+                            <img src="<?php echo htmlspecialchars($related['image'] ?? $related['image_url']); ?>" 
+                                 alt="<?php echo htmlspecialchars($related['title']); ?>" 
+                                 class="product-image">
+                        </a>
+                        <div class="product-info">
+                            <span class="product-category"><?php echo htmlspecialchars($related['category']); ?></span>
+                            <h3 class="product-title">
+                                <a href="<?php echo BASE_URL; ?>/pages/product.php?id=<?php echo $related['id']; ?>" class="product-title-link">
+                                    <?php echo htmlspecialchars($related['title']); ?>
+                                </a>
+                            </h3>
+                            <div class="product-price"><?php echo formatPrice($related['price']); ?></div>
                         </div>
                     </div>
+                </div>
                 <?php endforeach; ?>
             </div>
         </div>
@@ -592,83 +496,60 @@ if ($product['category']) {
 </div>
 
 <script>
-function changeImage(src) {
-    document.getElementById('mainImage').src = src;
-    // Update active thumbnail
-    document.querySelectorAll('.thumbnail').forEach(thumb => {
-        thumb.classList.remove('active');
-        if (thumb.src === src) {
-            thumb.classList.add('active');
-        }
-    });
-}
-
-function updateQuantity(change) {
-    const input = document.getElementById('quantity');
-    const newValue = parseInt(input.value) + change;
-    if (newValue >= 1) {
-        input.value = newValue;
-    }
-}
-
-function addToCart(productId) {
-    const quantity = parseInt(document.getElementById('quantity').value);
-    fetch('/api/cart/add.php', {
+document.getElementById('addToCartForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    formData.append('product_id', '<?php echo $product_id; ?>');
+    
+    fetch('<?php echo BASE_URL; ?>/api/cart/add.php', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            product_id: productId,
-            quantity: quantity
-        })
+        body: formData
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('Product added to cart!');
-            updateCartCount(data.cartCount);
+            // Update cart count in header
+            document.getElementById('headerCartCount').textContent = data.cart_count;
+            
+            // Show success message
+            Toastify({
+                text: data.message,
+                duration: 3000,
+                gravity: "top",
+                position: "right",
+                backgroundColor: "linear-gradient(to right, #00b09b, #96c93d)",
+                stopOnFocus: true
+            }).showToast();
         } else {
-            alert(data.message || 'Error adding product to cart');
+            // Handle error
+            Toastify({
+                text: data.message || "An error occurred",
+                duration: 3000,
+                gravity: "top",
+                position: "right",
+                backgroundColor: "linear-gradient(to right, #ff416c, #ff4b2b)",
+                stopOnFocus: true
+            }).showToast();
+            
+            // Redirect to login if not authenticated
+            if (data.redirect) {
+                window.location.href = data.redirect;
+            }
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error adding product to cart');
+        Toastify({
+            text: "An error occurred while adding to cart",
+            duration: 3000,
+            gravity: "top",
+            position: "right",
+            backgroundColor: "linear-gradient(to right, #ff416c, #ff4b2b)",
+            stopOnFocus: true
+        }).showToast();
     });
-}
-
-function addToWishlist(productId) {
-    fetch('/api/wishlist/add.php', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            product_id: productId
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Product added to wishlist!');
-        } else {
-            alert(data.message || 'Error adding product to wishlist');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error adding product to wishlist');
-    });
-}
-
-function updateCartCount(count) {
-    const cartCountElement = document.querySelector('.cart-count');
-    if (cartCountElement) {
-        cartCountElement.textContent = count;
-        cartCountElement.style.display = count > 0 ? 'inline' : 'none';
-    }
-}
+});
 </script>
 
 <?php require_once '../includes/footer.php'; ?> 

@@ -648,43 +648,36 @@ switch ($sort_by) {
                         <div class="stock-status <?php echo $stockClass; ?>">
                             <?php echo $stockText; ?>
                         </div>
-                        <div class="product-image-container">
-                            <img src="<?php echo htmlspecialchars($product['image_url'] ?? $product['image']); ?>" 
-                             alt="<?php echo htmlspecialchars($product['title']); ?>"
-                             class="product-image">
-                        </div>
+                        <a href="<?php echo BASE_URL; ?>/pages/product_details.php?id=<?php echo $product['id']; ?>" class="product-image-container">
+                            <img src="<?php echo htmlspecialchars($product['image_url']); ?>" alt="<?php echo htmlspecialchars($product['title']); ?>" class="product-image">
+                        </a>
                         <div class="product-info">
-                            <div class="product-category">
-                                <?php echo htmlspecialchars(ucfirst($product['category'])); ?>
-                            </div>
+                            <span class="product-category"><?php echo htmlspecialchars($product['category']); ?></span>
                             <h3 class="product-title">
-                                <a href="product.php?id=<?php echo $product['id']; ?>" class="product-title-link">
+                                <a href="<?php echo BASE_URL; ?>/pages/product_details.php?id=<?php echo $product['id']; ?>" class="product-title-link">
                                     <?php echo htmlspecialchars($product['title']); ?>
                                 </a>
                             </h3>
-                            <p class="product-price"><?php echo formatPrice($product['price']); ?></p>
+                            <div class="product-price"><?php echo formatPrice($product['price']); ?></div>
                             <div class="product-rating">
                                 <div class="rating-stars">
                                     <?php
                                     $rating = isset($product['rating']['rate']) ? $product['rating']['rate'] : 4.5;
-                                    $fullStars = floor($rating);
-                                    $hasHalfStar = $rating - $fullStars >= 0.5;
+                                    $full_stars = floor($rating);
+                                    $half_star = $rating - $full_stars >= 0.5;
                                     
-                                    for ($i = 0; $i < $fullStars; $i++) {
-                                        echo '<i class="fas fa-star"></i>';
-                                    }
-                                    if ($hasHalfStar) {
-                                        echo '<i class="fas fa-star-half-alt"></i>';
-                                    }
-                                    $emptyStars = 5 - ceil($rating);
-                                    for ($i = 0; $i < $emptyStars; $i++) {
-                                        echo '<i class="far fa-star"></i>';
+                                    for ($i = 0; $i < 5; $i++) {
+                                        if ($i < $full_stars) {
+                                            echo '<i class="fas fa-star"></i>';
+                                        } elseif ($i == $full_stars && $half_star) {
+                                            echo '<i class="fas fa-star-half-alt"></i>';
+                                        } else {
+                                            echo '<i class="far fa-star"></i>';
+                                        }
                                     }
                                     ?>
                                 </div>
-                                <span class="rating-count">
-                                    (<?php echo isset($product['rating']['count']) ? $product['rating']['count'] : rand(10, 100); ?> reviews)
-                                </span>
+                                <span class="rating-count">(<?php echo isset($product['rating']['count']) ? $product['rating']['count'] : '0'; ?>)</span>
                             </div>
                             <div class="product-actions">
                                 <button class="btn-view-details" onclick="quickView(<?php echo htmlspecialchars(json_encode($product)); ?>)">Quick View</button>

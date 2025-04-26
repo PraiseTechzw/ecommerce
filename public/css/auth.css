@@ -158,6 +158,45 @@
     text-decoration: underline;
 }
 
+.payment-methods {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.payment-method {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    border: 2px solid #ddd;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.payment-method:hover {
+    border-color: var(--primary-color);
+    background: var(--light-gray);
+}
+
+.payment-method input[type="radio"] {
+    margin: 0;
+}
+
+.payment-method img {
+    height: 24px;
+    width: auto;
+}
+
+.success-message {
+    background: #d4edda;
+    color: #155724;
+    padding: 1rem;
+    border-radius: var(--border-radius);
+    margin-bottom: 1rem;
+}
+
 @media (max-width: 600px) {
     .auth-container {
         margin: 1rem;
