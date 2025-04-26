@@ -15,12 +15,12 @@ $api_categories = $api->getCategories();
 $db_categories = $conn->query("SELECT DISTINCT category FROM products")->fetchAll(PDO::FETCH_COLUMN);
 $categories = array_unique(array_merge($api_categories, $db_categories));
 
-// Get filter parameters
-$selected_category = isset($_GET['category']) ? $_GET['category'] : null;
-$search_query = isset($_GET['search']) ? $_GET['search'] : '';
-$sort_by = isset($_GET['sort']) ? $_GET['sort'] : 'newest';
-$price_range = isset($_GET['price_range']) ? $_GET['price_range'] : 'all';
-$rating_filter = isset($_GET['rating']) ? $_GET['rating'] : 'all';
+// Get filter parameters with default values
+$selected_category = $_GET['category'] ?? null;
+$search_query = $_GET['search'] ?? '';
+$sort_by = $_GET['sort'] ?? 'newest';
+$price_range = $_GET['price_range'] ?? 'all';
+$rating_filter = $_GET['rating'] ?? 'all';
 
 // Get products from both sources
 $api_products = $selected_category 
@@ -37,8 +37,8 @@ $products = array_merge($api_products, $db_products);
 // Apply filters
 if ($search_query) {
     $products = array_filter($products, function($product) use ($search_query) {
-        return stripos($product['title'], $search_query) !== false ||
-               stripos($product['description'], $search_query) !== false;
+        return stripos($product['title'] ?? '', $search_query) !== false ||
+               stripos($product['description'] ?? '', $search_query) !== false;
     });
 }
 
@@ -46,7 +46,7 @@ if ($search_query) {
 if ($price_range !== 'all') {
     list($min, $max) = explode('-', $price_range);
     $products = array_filter($products, function($product) use ($min, $max) {
-        return $product['price'] >= $min && $product['price'] <= $max;
+        return ($product['price'] ?? 0) >= $min && ($product['price'] ?? 0) <= $max;
     });
 }
 
@@ -62,12 +62,12 @@ if ($rating_filter !== 'all') {
 switch ($sort_by) {
     case 'price_low':
         usort($products, function($a, $b) {
-            return $a['price'] <=> $b['price'];
+            return ($a['price'] ?? 0) <=> ($b['price'] ?? 0);
         });
         break;
     case 'price_high':
         usort($products, function($a, $b) {
-            return $b['price'] <=> $a['price'];
+            return ($b['price'] ?? 0) <=> ($a['price'] ?? 0);
         });
         break;
     case 'rating':
@@ -648,17 +648,19 @@ switch ($sort_by) {
                         <div class="stock-status <?php echo $stockClass; ?>">
                             <?php echo $stockText; ?>
                         </div>
-                        <a href="<?php echo BASE_URL; ?>/pages/product_details.php?id=<?php echo $product['id']; ?>" class="product-image-container">
-                            <img src="<?php echo htmlspecialchars($product['image_url']); ?>" alt="<?php echo htmlspecialchars($product['title']); ?>" class="product-image">
+                        <a href="<?php echo BASE_URL; ?>/pages/product.php?id=<?php echo $product['id']; ?>" class="product-image-container">
+                            <img src="<?php echo htmlspecialchars($product['image'] ?? $product['image_url'] ?? 'https://via.placeholder.com/300x300?text=No+Image'); ?>" 
+                                 alt="<?php echo htmlspecialchars($product['title'] ?? 'Product Image'); ?>" 
+                                 class="product-image">
                         </a>
                         <div class="product-info">
-                            <span class="product-category"><?php echo htmlspecialchars($product['category']); ?></span>
+                            <span class="product-category"><?php echo htmlspecialchars($product['category'] ?? 'Uncategorized'); ?></span>
                             <h3 class="product-title">
-                                <a href="<?php echo BASE_URL; ?>/pages/product_details.php?id=<?php echo $product['id']; ?>" class="product-title-link">
-                                    <?php echo htmlspecialchars($product['title']); ?>
+                                <a href="<?php echo BASE_URL; ?>/pages/product.php?id=<?php echo $product['id']; ?>" class="product-title-link">
+                                    <?php echo htmlspecialchars($product['title'] ?? 'Untitled Product'); ?>
                                 </a>
                             </h3>
-                            <div class="product-price"><?php echo formatPrice($product['price']); ?></div>
+                            <div class="product-price"><?php echo formatPrice($product['price'] ?? 0); ?></div>
                             <div class="product-rating">
                                 <div class="rating-stars">
                                     <?php
@@ -716,7 +718,7 @@ switch ($sort_by) {
                             <p class="quick-view-description" id="quickViewDescription"></p>
                             <div class="quantity-selector">
                                 <button class="quantity-btn" onclick="updateQuantity(-1)">-</button>
-                                <input type="number" class="quantity-input" id="quantity" value="1" min="1">
+                                <input type="number" class="quantity-input" id="quantity" value="1" min="1" max="10">
                                 <button class="quantity-btn" onclick="updateQuantity(1)">+</button>
                             </div>
                             <button class="btn btn-primary" onclick="addToCartFromQuickView()">Add to Cart</button>
@@ -728,10 +730,8 @@ switch ($sort_by) {
     </div>
 </div>
 
-<?php require_once '../includes/footer.php'; ?> 
+<?php require_once '../includes/footer.php'; ?>
 
-<!-- Add the script.js file -->
-<script src="/public/js/script.js"></script>
 <script>
 // Function to handle adding items to cart
 function addToCart(productId) {

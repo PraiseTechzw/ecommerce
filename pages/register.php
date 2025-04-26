@@ -1,29 +1,14 @@
 <?php
 require_once '../includes/header.php';
 require_once '../config/database.php';
-require_once '../includes/PayPalService.php';
 
 $errors = [];
-$success_message = '';
-
-// Handle PayPal return
-if (isset($_GET['success']) && $_GET['success'] == 'true' && isset($_GET['token'])) {
-    $paypal = new PayPalService();
-    $response = $paypal->captureOrder($_GET['token']);
-    
-    if ($response && $response->result->status == 'COMPLETED') {
-        $success_message = "Payment successful! Your account has been created.";
-    } else {
-        $errors[] = "Payment failed. Please try again.";
-    }
-}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
     $confirm_password = $_POST['confirm_password'] ?? '';
-    $payment_method = $_POST['payment_method'] ?? '';
 
     // Enhanced validation
     if (empty($name)) $errors[] = "Name is required";
@@ -34,147 +19,108 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!preg_match("/[A-Z]/", $password)) $errors[] = "Password must contain at least one uppercase letter";
     if (!preg_match("/[0-9]/", $password)) $errors[] = "Password must contain at least one number";
     if ($password !== $confirm_password) $errors[] = "Passwords do not match";
-    if (empty($payment_method)) $errors[] = "Please select a payment method";
 
     if (empty($errors)) {
-        if ($payment_method === 'paypal') {
-            $paypal = new PayPalService();
-            $response = $paypal->createOrder('10.00', 'Premium Account Registration');
-            
-            if ($response && isset($response->result->links)) {
-                foreach ($response->result->links as $link) {
-                    if ($link->rel === 'approve') {
-                        header('Location: ' . $link->href);
-                        exit();
-                    }
-                }
-            }
-            $errors[] = "Failed to create PayPal order. Please try again.";
+        $db = new Database();
+        $conn = $db->getConnection();
+
+        // Check if email already exists
+        $stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
+        $stmt->execute([$email]);
+        if ($stmt->fetch()) {
+            $errors[] = "Email already registered";
         } else {
-            // Handle other payment methods here
-            $db = new Database();
-            $conn = $db->getConnection();
+            // Create new user
+            $password_hash = password_hash($password, PASSWORD_DEFAULT);
+            $stmt = $conn->prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)");
+            $stmt->execute([$name, $email, $password_hash]);
 
-            // Check if email already exists
-            $stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
-            $stmt->execute([$email]);
-            if ($stmt->fetch()) {
-                $errors[] = "Email already registered";
-            } else {
-                // Create new user
-                $password_hash = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $conn->prepare("INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)");
-                $stmt->execute([$name, $email, $password_hash]);
+            // Log in the new user
+            $_SESSION['user_id'] = $conn->lastInsertId();
+            $_SESSION['user_name'] = $name;
+            $_SESSION['user_email'] = $email;
+            $_SESSION['role'] = 'user';
 
-                // Log in the new user
-                $_SESSION['user_id'] = $conn->lastInsertId();
-                $_SESSION['user_name'] = $name;
-                $_SESSION['user_email'] = $email;
-                $_SESSION['role'] = 'user';
-
-                header('Location: home.php');
-                exit();
-            }
+            header('Location: home.php');
+            exit();
         }
     }
 }
 ?>
 
-<link rel="stylesheet" href="/public/css/auth.css">
+<div class="container">
+    <div class="auth-section">
+        <div class="auth-card">
+            <h1 class="text-center mb-4">Create Account</h1>
+            
+            <?php if (!empty($errors)): ?>
+                <div class="alert alert-error">
+                    <?php foreach ($errors as $error): ?>
+                        <p><?php echo htmlspecialchars($error); ?></p>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
 
-<div class="auth-container">
-    <div class="auth-header">
-        <h1>Create Account</h1>
-        <p>Join our community today</p>
-    </div>
-
-    <?php if (!empty($errors)): ?>
-        <div class="error-message">
-            <?php foreach ($errors as $error): ?>
-                <p><?php echo htmlspecialchars($error); ?></p>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
-
-    <?php if (!empty($success_message)): ?>
-        <div class="success-message">
-            <p><?php echo htmlspecialchars($success_message); ?></p>
-        </div>
-    <?php endif; ?>
-
-    <form method="POST" action="" class="auth-form" id="registerForm">
-        <div class="form-group">
-            <label for="name">Full Name</label>
-            <input type="text" id="name" name="name" value="<?php echo htmlspecialchars($_POST['name'] ?? ''); ?>" required>
-        </div>
-        
-        <div class="form-group">
-            <label for="email">Email</label>
-            <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>" required>
-        </div>
-        
-        <div class="form-group">
-            <label for="password">Password</label>
-            <input type="password" id="password" name="password" required>
-            <div class="password-strength">
-                <div class="password-strength-bar" id="passwordStrength"></div>
+            <form method="POST" action="" class="auth-form">
+                <div class="form-group">
+                    <label for="name">Full Name</label>
+                    <input type="text" id="name" name="name" value="<?php echo htmlspecialchars($_POST['name'] ?? ''); ?>" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirm_password">Confirm Password</label>
+                    <input type="password" id="confirm_password" name="confirm_password" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-block">Create Account</button>
+            </form>
+            
+            <div class="auth-links text-center mt-3">
+                <p>Already have an account? <a href="login.php">Login here</a></p>
             </div>
         </div>
-        
-        <div class="form-group">
-            <label for="confirm_password">Confirm Password</label>
-            <input type="password" id="confirm_password" name="confirm_password" required>
-        </div>
-
-        <div class="form-group">
-            <label>Payment Method</label>
-            <div class="payment-methods">
-                <label class="payment-method">
-                    <input type="radio" name="payment_method" value="paypal" required>
-                    <img src="https://www.paypalobjects.com/webstatic/mktg/logo/pp_cc_mark_37x23.jpg" alt="PayPal">
-                    <span>PayPal</span>
-                </label>
-            </div>
-        </div>
-        
-        <button type="submit" class="btn">Create Account</button>
-    </form>
-
-    <div class="social-login">
-        <p>Or sign up with</p>
-        <div class="social-buttons">
-            <button type="button" class="social-btn">
-                <i class="fab fa-google"></i> Google
-            </button>
-            <button type="button" class="social-btn">
-                <i class="fab fa-facebook"></i> Facebook
-            </button>
-        </div>
     </div>
-
-    <p class="auth-link">Already have an account? <a href="login.php">Login here</a></p>
 </div>
 
-<script>
-document.getElementById('password').addEventListener('input', function(e) {
-    const password = e.target.value;
-    const strengthBar = document.getElementById('passwordStrength');
-    let strength = 0;
-    
-    if (password.length >= 8) strength++;
-    if (password.match(/[A-Z]/)) strength++;
-    if (password.match(/[0-9]/)) strength++;
-    if (password.match(/[^A-Za-z0-9]/)) strength++;
-    
-    strengthBar.className = 'password-strength-bar';
-    if (strength <= 1) {
-        strengthBar.classList.add('password-strength-weak');
-    } else if (strength <= 3) {
-        strengthBar.classList.add('password-strength-medium');
-    } else {
-        strengthBar.classList.add('password-strength-strong');
+<style>
+    .auth-section {
+        max-width: 400px;
+        margin: 2rem auto;
     }
-});
-</script>
+    
+    .auth-card {
+        background: white;
+        border-radius: 10px;
+        padding: 2rem;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .auth-form {
+        margin-top: 2rem;
+    }
+    
+    .auth-links {
+        margin-top: 1rem;
+    }
+    
+    .auth-links a {
+        color: var(--secondary-color);
+        text-decoration: none;
+    }
+    
+    .auth-links a:hover {
+        text-decoration: underline;
+    }
+</style>
 
 <?php require_once '../includes/footer.php'; ?> 

@@ -2,6 +2,12 @@
 session_start();
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/../config/config.php';
+
+// Check if user is already logged in and redirect if needed
+if (isset($_SESSION['user_id']) && basename($_SERVER['PHP_SELF']) === 'login.php') {
+    header('Location: home.php');
+    exit();
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
