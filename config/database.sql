@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS orders (
     user_id INT,
     total_amount DECIMAL(10,2) NOT NULL,
     status ENUM('pending', 'completed', 'cancelled') DEFAULT 'pending',
+    paypal_order_id VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS order_items (
     product_id INT,
     quantity INT NOT NULL,
     price DECIMAL(10,2) NOT NULL,
+    is_api_product BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id),
     FOREIGN KEY (product_id) REFERENCES products(id)

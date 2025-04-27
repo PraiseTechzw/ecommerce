@@ -52,19 +52,10 @@ class OrderService {
 
     public function getOrderDetails($orderId) {
         $stmt = $this->pdo->prepare("
-            SELECT o.*, oi.*, 
-                   CASE 
-                       WHEN oi.is_api_product = 1 THEN api.title
-                       ELSE p.title
-                   END as product_title,
-                   CASE 
-                       WHEN oi.is_api_product = 1 THEN api.image
-                       ELSE p.image
-                   END as product_image
+            SELECT o.*, oi.*, p.title as product_title, p.image_url as product_image
             FROM orders o
             JOIN order_items oi ON o.id = oi.order_id
-            LEFT JOIN products p ON oi.product_id = p.id AND oi.is_api_product = 0
-            LEFT JOIN api_products api ON oi.product_id = api.id AND oi.is_api_product = 1
+            JOIN products p ON oi.product_id = p.id
             WHERE o.id = ?
         ");
         $stmt->execute([$orderId]);
