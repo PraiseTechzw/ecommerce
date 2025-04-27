@@ -29,8 +29,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['paypal'])) {
             foreach ($order->links as $link) {
                 if ($link->rel === 'approve') {
                     header('Location: ' . $link->href);
-                    exit();
-                }
+    exit();
+}
             }
             $error = "No approval link found in PayPal response";
         } else {
@@ -241,9 +241,9 @@ require_once '../includes/header.php';
                             </div>
                         </div>
                     <?php endforeach; ?>
-                </div>
             </div>
-            
+            </div>
+
             <div class="col-lg-4">
                 <div class="payment-card">
                     <h2 class="mb-4">Payment Method</h2>
@@ -268,9 +268,9 @@ require_once '../includes/header.php';
                             <span>$<?php echo number_format($total, 2); ?></span>
                         </div>
                     </div>
-                </div>
             </div>
-        </div>
+            </div>
+            </div>
     </div>
 
     <?php include '../includes/footer.php'; ?>

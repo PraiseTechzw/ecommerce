@@ -1,8 +1,9 @@
 <?php
-require_once '../includes/header.php';
+session_start();
 require_once '../includes/Cart.php';
 
-if (!isLoggedIn()) {
+// Check login status
+if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit();
 }
@@ -34,8 +35,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// Get cart data
 $cartItems = $cart->getCartItems($userId);
 $cartTotal = $cart->getCartTotal($userId);
+
+// Now include header and start output
+require_once '../includes/header.php';
 ?>
 
 <div class="container py-5">
@@ -44,8 +49,8 @@ $cartTotal = $cart->getCartTotal($userId);
     <?php if (empty($cartItems)): ?>
         <div class="alert alert-info">
             Your cart is empty. <a href="products.php">Continue shopping</a>
-        </div>
-    <?php else: ?>
+            </div>
+        <?php else: ?>
         <div class="row">
             <div class="col-md-8">
                 <div class="card">
@@ -85,11 +90,11 @@ $cartTotal = $cart->getCartTotal($userId);
                                             <td>
                                                 <form method="POST" class="d-inline">
                                                     <input type="hidden" name="action" value="remove">
-                                                    <input type="hidden" name="product_id" value="<?php echo $item['product_id']; ?>">
+                                <input type="hidden" name="product_id" value="<?php echo $item['product_id']; ?>">
                                                     <button type="submit" class="btn btn-danger btn-sm">
                                                         <i class="fas fa-trash"></i>
                                                     </button>
-                                                </form>
+                            </form>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -105,13 +110,13 @@ $cartTotal = $cart->getCartTotal($userId);
                     <div class="card-body">
                         <h5 class="card-title">Order Summary</h5>
                         <div class="d-flex justify-content-between mb-2">
-                            <span>Subtotal:</span>
+                        <span>Subtotal:</span>
                             <span>$<?php echo number_format($cartTotal, 2); ?></span>
-                        </div>
+                    </div>
                         <div class="d-flex justify-content-between mb-2">
-                            <span>Shipping:</span>
-                            <span>Free</span>
-                        </div>
+                        <span>Shipping:</span>
+                        <span>Free</span>
+                    </div>
                         <hr>
                         <div class="d-flex justify-content-between mb-3">
                             <strong>Total:</strong>
@@ -124,9 +129,9 @@ $cartTotal = $cart->getCartTotal($userId);
                         </form>
                     </div>
                 </div>
+                </div>
             </div>
-        </div>
-    <?php endif; ?>
+        <?php endif; ?>
 </div>
 
 <script>
