@@ -25,13 +25,13 @@ if (isset($_POST['delete_product'])) {
 $stmt = $conn->query("
     SELECT p.*, c.name as category_name 
     FROM products p 
-    LEFT JOIN categories c ON p.category_id = c.id 
+    LEFT JOIN category c ON p.category_id = c.id 
     ORDER BY p.created_at DESC
 ");
 $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Get categories for the add/edit form
-$stmt = $conn->query("SELECT * FROM categories ORDER BY name");
+$stmt = $conn->query("SELECT * FROM category ORDER BY name");
 $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 

@@ -44,7 +44,7 @@ $stats['total_users'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
 
 // Get recent orders
 $stmt = $conn->query("
-    SELECT o.*, u.username 
+    SELECT o.*, u.name 
     FROM orders o 
     JOIN users u ON o.user_id = u.id 
     ORDER BY o.created_at DESC 
@@ -117,7 +117,7 @@ $recent_orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <?php foreach ($recent_orders as $order): ?>
                             <tr>
                                 <td>#<?php echo $order['id']; ?></td>
-                                <td><?php echo htmlspecialchars($order['username']); ?></td>
+                                <td><?php echo htmlspecialchars($order['name']); ?></td>
                                 <td>$<?php echo number_format($order['total_amount'], 2); ?></td>
                                 <td>
                                     <span class="badge bg-<?php 
