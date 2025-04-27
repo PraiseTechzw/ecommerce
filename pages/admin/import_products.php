@@ -29,55 +29,110 @@ $db = new Database();
 $conn = $db->getConnection();
 $api = new FakeStoreAPI();
 
+// Debug database connection
+echo "<pre>Database connection status: " . ($conn ? "Connected" : "Failed") . "</pre>";
+
+// Debug form submission
+echo "<pre>Request method: " . $_SERVER['REQUEST_METHOD'] . "</pre>";
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    echo "<pre>POST data:\n";
+    print_r($_POST);
+    echo "</pre>";
+}
+
 // Handle import
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    echo "<pre>Form submitted</pre>";
     try {
+        echo "<pre>Starting import process...</pre>";
+        
         // Get all products from FakeStore API
+        echo "<pre>Fetching products from API...</pre>";
         $products = $api->getAllProducts();
+        echo "<pre>API Response:\n";
+        print_r($products);
+        echo "</pre>";
+        
+        if (empty($products)) {
+            throw new Exception("No products received from the API");
+        }
+        
         $imported = 0;
         $errors = [];
 
         foreach ($products as $product) {
-            // Check if product already exists
-            $stmt = $conn->prepare("SELECT id FROM products WHERE title = ? AND is_api_product = 1");
-            $stmt->execute([$product['title']]);
-            if ($stmt->fetch()) {
-                continue; // Skip if product already exists
-            }
+            try {
+                echo "<pre>Processing product: " . $product['title'] . "</pre>";
+                
+                // Check if product already exists
+                $stmt = $conn->prepare("SELECT id FROM products WHERE title = ? AND is_api_product = 1");
+                $stmt->execute([$product['title']]);
+                $existing = $stmt->fetch();
+                
+                if ($existing) {
+                    echo "<pre>Product already exists, skipping: " . $product['title'] . "</pre>";
+                    continue;
+                }
 
-            // Download and save image
-            $image_url = $product['image'];
-            $image_name = basename($image_url);
-            $local_image_path = '/public/images/products/' . $image_name;
-            $full_image_path = __DIR__ . '/../../' . $local_image_path;
-            
-            // Create directory if it doesn't exist
-            if (!file_exists(dirname($full_image_path))) {
-                mkdir(dirname($full_image_path), 0777, true);
-            }
-            
-            // Download image
-            file_put_contents($full_image_path, file_get_contents($image_url));
+                // Download and save image
+                $image_url = $product['image'];
+                echo "<pre>Downloading image from: " . $image_url . "</pre>";
+                
+                $image_name = basename($image_url);
+                $local_image_path = '/public/images/products/' . $image_name;
+                $full_image_path = __DIR__ . '/../../' . $local_image_path;
+                
+                // Create directory if it doesn't exist
+                if (!file_exists(dirname($full_image_path))) {
+                    echo "<pre>Creating directory: " . dirname($full_image_path) . "</pre>";
+                    mkdir(dirname($full_image_path), 0777, true);
+                }
+                
+                // Download image with error handling
+                $image_content = @file_get_contents($image_url);
+                if ($image_content === false) {
+                    echo "<pre>Failed to download image: " . $image_url . "</pre>";
+                    $local_image_path = null;
+                } else {
+                    echo "<pre>Saving image to: " . $full_image_path . "</pre>";
+                    file_put_contents($full_image_path, $image_content);
+                }
 
-            // Insert product into database
-            $stmt = $conn->prepare("
-                INSERT INTO products (title, description, price, category, image_url, is_api_product, rating)
-                VALUES (?, ?, ?, ?, ?, 1, ?)
-            ");
-            
-            $result = $stmt->execute([
-                $product['title'],
-                $product['description'],
-                $product['price'],
-                $product['category'],
-                $local_image_path,
-                $product['rating']['rate']
-            ]);
+                // Insert product into database
+                echo "<pre>Inserting product into database...</pre>";
+                $stmt = $conn->prepare("
+                    INSERT INTO products (
+                        title, 
+                        description, 
+                        price, 
+                        category, 
+                        image_url, 
+                        is_api_product,
+                        stock
+                    ) VALUES (?, ?, ?, ?, ?, 1, ?)
+                ");
+                
+                $result = $stmt->execute([
+                    $product['title'],
+                    $product['description'],
+                    $product['price'],
+                    $product['category'],
+                    $local_image_path,
+                    10 // Default stock for imported products
+                ]);
 
-            if ($result) {
-                $imported++;
-            } else {
-                $errors[] = "Failed to import: " . $product['title'];
+                if ($result) {
+                    echo "<pre>Successfully imported: " . $product['title'] . "</pre>";
+                    $imported++;
+                } else {
+                    $error = "Failed to import: " . $product['title'];
+                    echo "<pre>" . $error . "</pre>";
+                    $errors[] = $error;
+                }
+            } catch (Exception $e) {
+                $error = "Error processing product '{$product['title']}': " . $e->getMessage();
+                echo "<pre>" . $error . "</pre>";
+                $errors[] = $error;
             }
         }
 
@@ -90,6 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import'])) {
             $_SESSION['message_type'] = 'warning';
         }
     } catch (Exception $e) {
+        echo "<pre>Error in import process: " . $e->getMessage() . "</pre>";
         $_SESSION['message'] = 'Error importing products: ' . $e->getMessage();
         $_SESSION['message_type'] = 'error';
     }
@@ -153,8 +209,9 @@ $imported_count = $result['count'];
         <p>Currently imported API products: <?php echo $imported_count; ?></p>
     </div>
 
-    <form method="POST" id="importForm">
-        <button type="submit" name="import" class="import-btn" id="importBtn">
+    <form method="POST" action="" id="importForm">
+        <input type="hidden" name="action" value="import">
+        <button type="submit" class="import-btn" id="importBtn">
             Import Products
         </button>
     </form>
