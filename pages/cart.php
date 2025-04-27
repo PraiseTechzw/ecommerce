@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
             case 'update':
-                if (isset($_POST['product_id']) && isset($_POST['quantity'])) {
+    if (isset($_POST['product_id']) && isset($_POST['quantity'])) {
                     $cart->updateQuantity($userId, $_POST['product_id'], $_POST['quantity']);
                 }
                 break;
@@ -45,7 +45,7 @@ require_once '../includes/header.php';
 
 <div class="container py-5">
     <h1 class="mb-4">Shopping Cart</h1>
-    
+
     <?php if (empty($cartItems)): ?>
         <div class="alert alert-info">
             Your cart is empty. <a href="products.php">Continue shopping</a>

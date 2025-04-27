@@ -1,20 +1,14 @@
 <?php
-// Start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/Cart.php';
+require_once __DIR__ . '/../../includes/functions.php';
 
-// Set content type to JSON
-header('Content-Type: application/json');
-
-// Include required files
-require_once '../../includes/functions.php';
-require_once '../../config/database.php';
-require_once '../../config/config.php';
+// Start session
+session_start();
 
 // Check if user is logged in
-if (!isLoggedIn()) {
-    http_response_code(401);
+if (!isset($_SESSION['user_id'])) {
+    header('Content-Type: application/json');
     echo json_encode([
         'success' => false,
         'message' => 'Please login to add items to cart',
@@ -23,74 +17,47 @@ if (!isLoggedIn()) {
     exit;
 }
 
-// Check if it's a POST request
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
+// Initialize cart
+$cart = new Cart();
+
+// Get POST data
+$product_id = isset($_POST['product_id']) ? (int)$_POST['product_id'] : 0;
+$quantity = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 1;
+$is_api_product = isset($_POST['is_api_product']) ? (bool)$_POST['is_api_product'] : false;
+
+// Validate input
+if ($product_id <= 0) {
+    header('Content-Type: application/json');
     echo json_encode([
         'success' => false,
-        'message' => 'Invalid request method'
+        'message' => 'Invalid product ID'
     ]);
     exit;
 }
 
 try {
-    // Get and validate product ID
-    $product_id = isset($_POST['product_id']) ? (int)$_POST['product_id'] : 0;
-    $quantity = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 1;
-
-    if ($product_id <= 0) {
-        http_response_code(400);
+    // Add to cart
+    $result = $cart->addToCart($_SESSION['user_id'], $product_id, $quantity, $is_api_product);
+    
+    if ($result) {
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => true,
+            'cart_count' => $cart->getCartCount($_SESSION['user_id']),
+            'message' => 'Product added to cart successfully'
+        ]);
+    } else {
+        header('Content-Type: application/json');
         echo json_encode([
             'success' => false,
-            'message' => 'Invalid product ID'
+            'message' => 'Failed to add product to cart'
         ]);
-        exit;
     }
-
-    if ($quantity <= 0) {
-        http_response_code(400);
-        echo json_encode([
-            'success' => false,
-            'message' => 'Invalid quantity'
-        ]);
-        exit;
-    }
-
-    // Initialize cart if not exists
-    if (!isset($_SESSION['cart'])) {
-        $_SESSION['cart'] = [];
-    }
-
-    // Check if product already in cart
-    $found = false;
-    foreach ($_SESSION['cart'] as &$item) {
-        if ($item['product_id'] == $product_id) {
-            $item['quantity'] += $quantity;
-            $found = true;
-            break;
-        }
-    }
-
-    // If product not in cart, add it
-    if (!$found) {
-        $_SESSION['cart'][] = [
-            'product_id' => $product_id,
-            'quantity' => $quantity
-        ];
-    }
-
-    // Return success response
-    http_response_code(200);
-    echo json_encode([
-        'success' => true,
-        'cart_count' => getCartCount(),
-        'message' => 'Product added to cart successfully'
-    ]);
-
 } catch (Exception $e) {
-    http_response_code(500);
+    error_log("Error in cart API: " . $e->getMessage());
+    header('Content-Type: application/json');
     echo json_encode([
         'success' => false,
-        'message' => 'An error occurred while processing your request'
+        'message' => 'An error occurred while adding to cart'
     ]);
 } 

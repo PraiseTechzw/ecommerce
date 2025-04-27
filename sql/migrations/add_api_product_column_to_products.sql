@@ -1,0 +1,2 @@
+ALTER TABLE products
+ADD COLUMN is_api_product TINYINT(1) NOT NULL DEFAULT 0; 

@@ -1,6 +1,7 @@
 <?php
 require_once '../includes/header.php';
 require_once '../config/database.php';
+require_once '../includes/Cart.php';
 
 // Check if product ID is provided
 if (!isset($_GET['id'])) {
@@ -9,6 +10,7 @@ if (!isset($_GET['id'])) {
 
 $db = new Database();
 $conn = $db->getConnection();
+$cart = new Cart($conn);
 
 // Get product details
 $product_id = $_GET['id'];
@@ -20,49 +22,55 @@ if (!$product) {
 
 // Handle add to cart
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
+    error_log("Add to cart form submitted");
+    
     if (!isLoggedIn()) {
+        error_log("User not logged in, redirecting to login");
         $_SESSION['message'] = 'Please login to add items to cart';
         $_SESSION['message_type'] = 'warning';
         redirect(BASE_URL . '/pages/login.php');
     }
 
     $quantity = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 1;
+    $is_api_product = isset($_POST['is_api_product']) ? (bool)$_POST['is_api_product'] : false;
     
-    // Initialize cart if not exists
-    if (!isset($_SESSION['cart'])) {
-        $_SESSION['cart'] = [];
-    }
+    error_log("Processing add to cart - User ID: {$_SESSION['user_id']}, Product ID: $product_id, Quantity: $quantity, Is API Product: " . ($is_api_product ? 'Yes' : 'No'));
+    
+    try {
+        $result = $cart->addToCart($_SESSION['user_id'], $product_id, $quantity, $is_api_product);
+        error_log("Add to cart result: " . ($result ? "Success" : "Failed"));
+        
+        if ($result) {
+            // Return JSON response for AJAX
+            if (isset($_POST['ajax'])) {
+                error_log("Sending AJAX success response");
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'success' => true,
+                    'cart_count' => $cart->getCartCount($_SESSION['user_id']),
+                    'message' => 'Product added to cart successfully'
+                ]);
+                exit;
+            }
 
-    // Check if product already in cart
-    $found = false;
-    foreach ($_SESSION['cart'] as &$item) {
-        if ($item['product_id'] == $product_id) {
-            $item['quantity'] += $quantity;
-            $found = true;
-            break;
+            redirect(BASE_URL . '/pages/cart.php', 'Product added to cart successfully');
+        } else {
+            error_log("Failed to add product to cart");
+            throw new Exception("Failed to add product to cart");
         }
+    } catch (Exception $e) {
+        error_log("Error adding to cart: " . $e->getMessage());
+        if (isset($_POST['ajax'])) {
+            error_log("Sending AJAX error response");
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to add product to cart: ' . $e->getMessage()
+            ]);
+            exit;
+        }
+        redirect(BASE_URL . '/pages/product_details.php?id=' . $product_id, 'Failed to add product to cart', 'error');
     }
-
-    // If product not in cart, add it
-    if (!$found) {
-        $_SESSION['cart'][] = [
-            'product_id' => $product_id,
-            'quantity' => $quantity
-        ];
-    }
-
-    // Return JSON response for AJAX
-    if (isset($_POST['ajax'])) {
-        header('Content-Type: application/json');
-        echo json_encode([
-            'success' => true,
-            'cart_count' => getCartCount(),
-            'message' => 'Product added to cart successfully'
-        ]);
-        exit;
-    }
-
-    redirect(BASE_URL . '/pages/cart.php', 'Product added to cart successfully');
 }
 ?>
 
@@ -171,11 +179,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
             <div class="product-price"><?php echo formatPrice($product['price']); ?></div>
             <p class="product-description"><?php echo htmlspecialchars($product['description']); ?></p>
             
-            <form method="POST" id="addToCartForm">
+            <form method="POST" id="addToCartForm" action="<?php echo BASE_URL; ?>/api/cart/add.php">
                 <div class="quantity-selector">
                     <label for="quantity">Quantity:</label>
                     <input type="number" id="quantity" name="quantity" class="quantity-input" value="1" min="1" max="10">
                 </div>
+                <input type="hidden" name="product_id" value="<?php echo $product_id; ?>">
+                <input type="hidden" name="is_api_product" value="<?php echo isset($product['is_api_product']) ? '1' : '0'; ?>">
                 <button type="submit" name="add_to_cart" class="add-to-cart-btn">Add to Cart</button>
             </form>
         </div>
@@ -183,59 +193,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
 </div>
 
 <script>
-document.getElementById('addToCartForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(this);
-    formData.append('product_id', '<?php echo $product_id; ?>');
-    
-    fetch('<?php echo BASE_URL; ?>/api/cart/add.php', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Update cart count in header
-            document.getElementById('headerCartCount').textContent = data.cart_count;
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('addToCartForm');
+    if (form) {
+        console.log('Form found, adding event listener');
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            console.log('Form submitted');
             
-            // Show success message
-            Toastify({
-                text: data.message,
-                duration: 3000,
-                gravity: "top",
-                position: "right",
-                backgroundColor: "linear-gradient(to right, #00b09b, #96c93d)",
-                stopOnFocus: true
-            }).showToast();
-        } else {
-            // Handle error
-            Toastify({
-                text: data.message || "An error occurred",
-                duration: 3000,
-                gravity: "top",
-                position: "right",
-                backgroundColor: "linear-gradient(to right, #ff416c, #ff4b2b)",
-                stopOnFocus: true
-            }).showToast();
+            const formData = new FormData(form);
+            console.log('Form data:', Object.fromEntries(formData));
             
-            // Redirect to login if not authenticated
-            if (data.redirect) {
-                window.location.href = data.redirect;
-            }
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        Toastify({
-            text: "An error occurred while adding to cart",
-            duration: 3000,
-            gravity: "top",
-            position: "right",
-            backgroundColor: "linear-gradient(to right, #ff416c, #ff4b2b)",
-            stopOnFocus: true
-        }).showToast();
-    });
+            fetch(form.action, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('Response data:', data);
+                if (data.success) {
+                    // Update cart count in header if element exists
+                    const cartCount = document.getElementById('headerCartCount');
+                    if (cartCount) {
+                        cartCount.textContent = data.cart_count;
+                    }
+                    
+                    // Show success message
+                    Toastify({
+                        text: data.message,
+                        duration: 3000,
+                        gravity: "top",
+                        position: "right",
+                        style: {
+                            background: "linear-gradient(to right, #00b09b, #96c93d)"
+                        }
+                    }).showToast();
+                } else {
+                    // Show error message
+                    Toastify({
+                        text: data.message || "An error occurred",
+                        duration: 3000,
+                        gravity: "top",
+                        position: "right",
+                        style: {
+                            background: "linear-gradient(to right, #ff416c, #ff4b2b)"
+                        }
+                    }).showToast();
+                    
+                    // Redirect to login if needed
+                    if (data.redirect) {
+                        window.location.href = data.redirect;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                Toastify({
+                    text: "An error occurred while adding to cart",
+                    duration: 3000,
+                    gravity: "top",
+                    position: "right",
+                    style: {
+                        background: "linear-gradient(to right, #ff416c, #ff4b2b)"
+                    }
+                }).showToast();
+            });
+        });
+    } else {
+        console.error('Form not found!');
+    }
 });
 </script>
 

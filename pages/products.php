@@ -95,9 +95,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
     
     $productId = $_POST['product_id'];
     $quantity = $_POST['quantity'] ?? 1;
+    $isApiProduct = isset($_POST['is_api_product']) && $_POST['is_api_product'] === '1';
     
     $cart = new Cart();
-    $cart->addToCart($_SESSION['user_id'], $productId, $quantity);
+    if ($cart->addToCart($_SESSION['user_id'], $productId, $quantity, $isApiProduct)) {
+        $_SESSION['success_message'] = "Product added to cart successfully!";
+    } else {
+        $_SESSION['error_message'] = "Failed to add product to cart.";
+    }
     
     // Redirect to prevent form resubmission
     header('Location: products.php' . ($selected_category ? "?category=$selected_category" : '') . ($search_query ? "&search=$search_query" : ''));
@@ -703,11 +708,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
                             <div class="product-actions">
                                 <button class="btn-view-details" onclick="quickView(<?php echo htmlspecialchars(json_encode($product)); ?>)">Quick View</button>
                                 <?php if ($stock > 0): ?>
-                                    <form method="POST" class="d-flex align-items-center">
+                                    <form method="POST" class="add-to-cart-form">
+                                        <input type="hidden" name="add_to_cart" value="1">
                                         <input type="hidden" name="product_id" value="<?php echo $product['id']; ?>">
-                                        <input type="number" name="quantity" value="1" min="1" max="99" 
-                                               class="form-control me-2" style="width: 70px;">
-                                        <button type="submit" name="add_to_cart" class="btn btn-primary">
+                                        <input type="hidden" name="is_api_product" value="<?php echo isset($product['source']) && $product['source'] === 'api' ? '1' : '0'; ?>">
+                                        <div class="quantity-input">
+                                            <input type="number" name="quantity" value="1" min="1" class="form-control">
+                                        </div>
+                                        <button type="submit" class="btn btn-primary add-to-cart-btn">
                                             <i class="fas fa-shopping-cart"></i> Add to Cart
                                         </button>
                                     </form>

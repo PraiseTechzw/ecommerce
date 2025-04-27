@@ -1,5 +1,5 @@
 <?php
-require_once '../includes/header.php';
+require_once '../includes/header_logic.php';
 
 // Handle login form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if ($user && password_verify($password, $user['password'])) {
         $_SESSION['user_id'] = $user['id'];
-        $_SESSION['username'] = $user['username'];
+        $_SESSION['name'] = $user['name'];
         $_SESSION['role'] = $user['role'];
         
         header('Location: home.php');
@@ -25,6 +25,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = "Invalid email or password";
     }
 }
+
+// Include the HTML header after any potential redirects
+require_once '../includes/header.php';
 ?>
 
 <div class="container">
