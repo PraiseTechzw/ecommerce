@@ -1,23 +1,27 @@
 <?php
-require_once '../includes/header.php';
-require_once '../includes/Cart.php';
-require_once '../services/PayPalService.php';
-
-if (!isLoggedIn()) {
+// Start session and check login
+session_start();
+if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit();
 }
+
+// Initialize services
+require_once '../includes/Cart.php';
+require_once '../services/PayPalService.php';
 
 $cart = new Cart();
 $userId = $_SESSION['user_id'];
 $paypalService = new PayPalService();
 
+// Get cart data
 $cartItems = $cart->getCartItems($userId);
 $total = $cart->getCartTotal($userId);
 
 $error = null;
 $success = null;
 
+// Handle PayPal order creation
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['paypal'])) {
     try {
         $order = $paypalService->createOrder($cartItems, $total);
@@ -37,6 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['paypal'])) {
         error_log($e->getMessage());
     }
 }
+
+// Now include the header and start output
+require_once '../includes/header.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -240,8 +247,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['paypal'])) {
             <div class="col-lg-4">
                 <div class="payment-card">
                     <h2 class="mb-4">Payment Method</h2>
-                    <form method="POST">
-                        <button type="submit" name="paypal" class="paypal-button">
+                    <form method="POST" id="paypal-form">
+                        <button type="submit" name="paypal" class="paypal-button" id="paypal-button">
                             <img src="../assets/images/paypal.png" alt="PayPal">
                             Pay with PayPal
                         </button>
@@ -269,5 +276,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['paypal'])) {
     <?php include '../includes/footer.php'; ?>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('paypal-form').addEventListener('submit', function(e) {
+            console.log('PayPal form submitted');
+        });
+        
+        document.getElementById('paypal-button').addEventListener('click', function(e) {
+            console.log('PayPal button clicked');
+        });
+    </script>
 </body>
 </html> 

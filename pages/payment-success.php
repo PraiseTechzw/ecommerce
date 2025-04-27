@@ -1,71 +1,114 @@
 <?php
-require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/../services/PayPalService.php';
-require_once __DIR__ . '/../services/CartService.php';
-require_once __DIR__ . '/../services/OrderService.php';
-
 session_start();
+require_once '../includes/Cart.php';
+require_once '../services/PayPalService.php';
+require_once '../services/OrderService.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit();
 }
 
+$userId = $_SESSION['user_id'];
+$cart = new Cart();
 $paypalService = new PayPalService();
-$cartService = new CartService($pdo);
-$orderService = new OrderService($pdo);
+$orderService = new OrderService();
+
+$error = null;
+$success = null;
+$orderDetails = null;
 
 if (isset($_GET['token'])) {
-    $order = $paypalService->captureOrder($_GET['token']);
-    
-    if ($order && $order->status === 'COMPLETED') {
-        // Get cart items
-        $cart = $cartService->getCart($_SESSION['user_id']);
-        $total = $cartService->calculateTotal($cart);
+    try {
+        // Capture the PayPal order
+        $order = $paypalService->captureOrder($_GET['token']);
         
-        // Create order in database
-        $orderService->createOrder($_SESSION['user_id'], $cart, $total, $order->id);
-        
-        // Clear cart
-        $cartService->clearCart($_SESSION['user_id']);
-        
-        $success = true;
-    } else {
-        $error = "Payment failed. Please try again.";
+        if ($order && $order->status === 'COMPLETED') {
+            // Get cart items and total
+            $cartItems = $cart->getCartItems($userId);
+            $total = $cart->getCartTotal($userId);
+            
+            // Create order in database
+            $orderId = $orderService->createOrder($userId, $cartItems, $total, $order->id);
+            
+            // Get order details for display
+            $orderDetails = $orderService->getOrderDetails($orderId);
+            $success = "Payment successful! Your order has been placed.";
+        } else {
+            $error = "Payment was not completed successfully.";
+        }
+    } catch (Exception $e) {
+        $error = "Error processing payment: " . $e->getMessage();
+        error_log($e->getMessage());
     }
 } else {
-    header('Location: checkout.php');
-    exit();
+    $error = "No payment token provided.";
 }
+
+require_once '../includes/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Payment Success - E-Commerce</title>
-    <link rel="stylesheet" href="../assets/css/style.css">
-</head>
-<body>
-    <?php include '../includes/header.php'; ?>
 
-    <main class="container">
-        <?php if (isset($success)): ?>
-            <div class="success-message">
-                <h2>Payment Successful!</h2>
-                <p>Thank you for your purchase. Your order has been placed successfully.</p>
-                <p>Order ID: <?php echo htmlspecialchars($order->id); ?></p>
-                <a href="home.php" class="btn btn-primary">Continue Shopping</a>
-            </div>
-        <?php else: ?>
-            <div class="error-message">
-                <h2>Payment Failed</h2>
-                <p><?php echo htmlspecialchars($error); ?></p>
-                <a href="checkout.php" class="btn btn-primary">Try Again</a>
-            </div>
-        <?php endif; ?>
-    </main>
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <?php if ($error): ?>
+                        <div class="alert alert-danger">
+                            <?php echo htmlspecialchars($error); ?>
+                        </div>
+                    <?php endif; ?>
 
-    <?php include '../includes/footer.php'; ?>
-</body>
-</html> 
+                    <?php if ($success): ?>
+                        <div class="alert alert-success">
+                            <?php echo htmlspecialchars($success); ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if ($orderDetails): ?>
+                        <h2 class="mb-4">Order Details</h2>
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Product</th>
+                                        <th>Quantity</th>
+                                        <th>Price</th>
+                                        <th>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($orderDetails as $item): ?>
+                                        <tr>
+                                            <td>
+                                                <img src="<?php echo htmlspecialchars($item['product_image']); ?>" 
+                                                     alt="<?php echo htmlspecialchars($item['product_title']); ?>" 
+                                                     style="width: 50px; height: 50px; object-fit: cover;">
+                                                <?php echo htmlspecialchars($item['product_title']); ?>
+                                            </td>
+                                            <td><?php echo $item['quantity']; ?></td>
+                                            <td>$<?php echo number_format($item['price'], 2); ?></td>
+                                            <td>$<?php echo number_format($item['price'] * $item['quantity'], 2); ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td colspan="3" class="text-end"><strong>Total:</strong></td>
+                                        <td><strong>$<?php echo number_format($orderDetails[0]['total_amount'], 2); ?></strong></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+
+                    <div class="text-center mt-4">
+                        <a href="index.php" class="btn btn-primary">Continue Shopping</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php include '../includes/footer.php'; ?> 
