@@ -1,20 +1,17 @@
 <?php
 require_once '../includes/header.php';
-require_once '../api/fakestore.php';
 require_once '../config/database.php';
 require_once '../includes/Cart.php';
 
 // Check if user is logged in (needed for cart functionality check)
 $isUserLoggedIn = isLoggedIn();
 
-$api = new FakeStoreAPI();
 $db = new Database();
 $conn = $db->getConnection();
 
-// Get categories from both API and database
-$api_categories = $api->getCategories();
-$db_categories = $conn->query("SELECT DISTINCT category FROM products")->fetchAll(PDO::FETCH_COLUMN);
-$categories = array_unique(array_merge($api_categories, $db_categories));
+// Get categories from database
+$stmt = $conn->query("SELECT DISTINCT c.name FROM category c JOIN products p ON c.id = p.category_id");
+$categories = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
 // Get filter parameters with default values
 $selected_category = $_GET['category'] ?? null;
@@ -23,17 +20,10 @@ $sort_by = $_GET['sort'] ?? 'newest';
 $price_range = $_GET['price_range'] ?? 'all';
 $rating_filter = $_GET['rating'] ?? 'all';
 
-// Get products from both sources
-$api_products = $selected_category 
-    ? $api->getProductsByCategory($selected_category)
-    : $api->getProducts();
-
-$db_products = $selected_category
+// Get products from database
+$products = $selected_category
     ? getProductsByCategory($conn, $selected_category)
     : getAllProducts($conn);
-
-// Combine products from both sources
-$products = array_merge($api_products, $db_products);
 
 // Apply filters
 if ($search_query) {
@@ -51,14 +41,6 @@ if ($price_range !== 'all') {
     });
 }
 
-// Apply rating filter
-if ($rating_filter !== 'all') {
-    $products = array_filter($products, function($product) use ($rating_filter) {
-        $rating = isset($product['rating']['rate']) ? $product['rating']['rate'] : 4.5;
-        return $rating >= $rating_filter;
-    });
-}
-
 // Sort products
 switch ($sort_by) {
     case 'price_low':
@@ -69,13 +51,6 @@ switch ($sort_by) {
     case 'price_high':
         usort($products, function($a, $b) {
             return ($b['price'] ?? 0) <=> ($a['price'] ?? 0);
-        });
-        break;
-    case 'rating':
-        usort($products, function($a, $b) {
-            $rating_a = isset($a['rating']['rate']) ? $a['rating']['rate'] : 4.5;
-            $rating_b = isset($b['rating']['rate']) ? $b['rating']['rate'] : 4.5;
-            return $rating_b <=> $rating_a;
         });
         break;
     case 'newest':
@@ -95,10 +70,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
     
     $productId = $_POST['product_id'];
     $quantity = $_POST['quantity'] ?? 1;
-    $isApiProduct = isset($_POST['is_api_product']) && $_POST['is_api_product'] === '1';
     
     $cart = new Cart();
-    if ($cart->addToCart($_SESSION['user_id'], $productId, $quantity, $isApiProduct)) {
+    if ($cart->addToCart($_SESSION['user_id'], $productId, $quantity)) {
         $_SESSION['success_message'] = "Product added to cart successfully!";
     } else {
         $_SESSION['error_message'] = "Failed to add product to cart.";
@@ -665,7 +639,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
                 <?php foreach ($products as $product): ?>
                     <div class="product-card">
                         <?php
-                        $stock = $product['stock'] ?? 100;
+                        $stock = $product['stock'] ?? 0;
                         $stockClass = $stock > 20 ? 'in-stock' : ($stock > 0 ? 'low-stock' : 'out-of-stock');
                         $stockText = $stock > 20 ? 'In Stock' : ($stock > 0 ? 'Low Stock' : 'Out of Stock');
                         ?>
@@ -673,18 +647,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
                             <?php echo $stockText; ?>
                         </div>
                         <a href="<?php echo BASE_URL; ?>/pages/product.php?id=<?php echo $product['id']; ?>" class="product-image-container">
-                            <img src="<?php echo htmlspecialchars($product['image'] ?? $product['image_url'] ?? 'https://via.placeholder.com/300x300?text=No+Image'); ?>" 
-                                 alt="<?php echo htmlspecialchars($product['title'] ?? 'Product Image'); ?>" 
+                            <img src="<?php echo BASE_URL . '/' . htmlspecialchars($product['image_url']); ?>" 
+                                 alt="<?php echo htmlspecialchars($product['title']); ?>" 
                                  class="product-image">
                         </a>
                         <div class="product-info">
-                            <span class="product-category"><?php echo htmlspecialchars($product['category'] ?? 'Uncategorized'); ?></span>
+                            <span class="product-category"><?php echo htmlspecialchars($product['category_name'] ?? 'Uncategorized'); ?></span>
                             <h3 class="product-title">
                                 <a href="<?php echo BASE_URL; ?>/pages/product.php?id=<?php echo $product['id']; ?>" class="product-title-link">
-                                    <?php echo htmlspecialchars($product['title'] ?? 'Untitled Product'); ?>
+                                    <?php echo htmlspecialchars($product['title']); ?>
                                 </a>
                             </h3>
-                            <div class="product-price"><?php echo formatPrice($product['price'] ?? 0); ?></div>
+                            <div class="product-price"><?php echo formatPrice($product['price']); ?></div>
                             <div class="product-rating">
                                 <div class="rating-stars">
                                     <?php
@@ -711,7 +685,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
                                     <form method="POST" class="add-to-cart-form">
                                         <input type="hidden" name="add_to_cart" value="1">
                                         <input type="hidden" name="product_id" value="<?php echo $product['id']; ?>">
-                                        <input type="hidden" name="is_api_product" value="<?php echo isset($product['source']) && $product['source'] === 'api' ? '1' : '0'; ?>">
                                         <div class="quantity-input">
                                             <input type="number" name="quantity" value="1" min="1" class="form-control">
                                         </div>

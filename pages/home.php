@@ -12,7 +12,8 @@ $featured_products = $api->getProducts(4);
 
 // Get categories
 $api_categories = $api->getCategories();
-$db_categories = $conn->query("SELECT DISTINCT category FROM products")->fetchAll(PDO::FETCH_COLUMN);
+$stmt = $conn->query("SELECT DISTINCT c.name FROM category c JOIN products p ON c.id = p.category_id");
+$db_categories = $stmt->fetchAll(PDO::FETCH_COLUMN);
 $categories = array_unique(array_merge($api_categories, $db_categories));
 ?>
 

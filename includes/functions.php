@@ -53,9 +53,14 @@ function getAllProducts($conn) {
 
 // Get products by category
 function getProductsByCategory($conn, $category) {
-    $stmt = $conn->prepare("SELECT * FROM products WHERE category = ? ORDER BY created_at DESC");
+    $stmt = $conn->prepare("
+        SELECT p.* 
+        FROM products p 
+        JOIN category c ON p.category_id = c.id 
+        WHERE c.name = ?
+    ");
     $stmt->execute([$category]);
-    return $stmt->fetchAll();
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // Search products

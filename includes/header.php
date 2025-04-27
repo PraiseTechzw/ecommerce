@@ -317,7 +317,7 @@ if (isset($_SESSION['user_id']) && basename($_SERVER['PHP_SELF']) === 'login.php
                     <li><a href="<?php echo BASE_URL; ?>/pages/home.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'home.php' ? 'active' : ''; ?>">Home</a></li>
                     <li><a href="<?php echo BASE_URL; ?>/pages/products.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'products.php' ? 'active' : ''; ?>">Products</a></li>
                     <?php if (isAdmin()): ?>
-                        <li><a href="<?php echo BASE_URL; ?>/pages/admin/" class="<?php echo strpos($_SERVER['PHP_SELF'], 'admin/') !== false ? 'active' : ''; ?>">Admin</a></li>
+                        <li><a href="<?php echo BASE_URL; ?>/pages/admin/dashboard.php" class="<?php echo strpos($_SERVER['PHP_SELF'], 'admin/') !== false ? 'active' : ''; ?>">Admin</a></li>
                     <?php endif; ?>
                 </ul>
             </nav>

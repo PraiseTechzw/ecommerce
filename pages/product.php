@@ -1,26 +1,24 @@
 <?php
 require_once '../includes/header.php';
-require_once '../api/fakestore.php';
 require_once '../config/database.php';
 require_once '../includes/Cart.php';
 
 // Get product ID from URL
 $product_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
-// Initialize API and Database
-$api = new FakeStoreAPI();
+// Initialize Database
 $db = new Database();
 $conn = $db->getConnection();
 
-// Try to get product from API first
-$product = $api->getProduct($product_id);
-
-// If not found in API, try database
-if (!$product) {
-    $stmt = $conn->prepare("SELECT * FROM products WHERE id = ?");
-    $stmt->execute([$product_id]);
-    $product = $stmt->fetch(PDO::FETCH_ASSOC);
-}
+// Get product from database
+$stmt = $conn->prepare("
+    SELECT p.*, c.name as category_name 
+    FROM products p 
+    LEFT JOIN category c ON p.category_id = c.id 
+    WHERE p.id = ?
+");
+$stmt->execute([$product_id]);
+$product = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // If product not found, redirect to products page
 if (!$product) {
@@ -30,16 +28,16 @@ if (!$product) {
 
 // Get related products
 $related_products = [];
-if ($product['category']) {
-    $api_related = $api->getProductsByCategory($product['category']);
-    $db_related = getProductsByCategory($conn, $product['category']);
-    $related_products = array_merge($api_related, $db_related);
-    // Remove current product from related products
-    $related_products = array_filter($related_products, function($p) use ($product_id) {
-        return $p['id'] != $product_id;
-    });
-    // Limit to 4 related products
-    $related_products = array_slice($related_products, 0, 4);
+if ($product['category_id']) {
+    $stmt = $conn->prepare("
+        SELECT p.*, c.name as category_name 
+        FROM products p 
+        LEFT JOIN category c ON p.category_id = c.id 
+        WHERE p.category_id = ? AND p.id != ?
+        LIMIT 4
+    ");
+    $stmt->execute([$product['category_id'], $product_id]);
+    $related_products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // Handle add to cart
@@ -428,14 +426,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
             <div class="row">
                 <div class="col-md-6">
                     <div class="product-gallery">
-                        <img src="<?php echo htmlspecialchars($product['image'] ?? $product['image_url']); ?>" 
+                        <img src="<?php echo BASE_URL . '/' . htmlspecialchars($product['image_url']); ?>" 
                              alt="<?php echo htmlspecialchars($product['title']); ?>" 
                              class="main-image">
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="product-info">
-                        <span class="product-category"><?php echo htmlspecialchars($product['category']); ?></span>
+                        <span class="product-category"><?php echo htmlspecialchars($product['category_name']); ?></span>
                         <h1 class="product-title"><?php echo htmlspecialchars($product['title']); ?></h1>
                         <div class="product-price"><?php echo formatPrice($product['price']); ?></div>
                         
@@ -490,12 +488,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
                 <div class="col-md-3">
                     <div class="product-card">
                         <a href="<?php echo BASE_URL; ?>/pages/product.php?id=<?php echo $related['id']; ?>" class="product-image-container">
-                            <img src="<?php echo htmlspecialchars($related['image'] ?? $related['image_url']); ?>" 
+                            <img src="<?php echo BASE_URL . '/' . htmlspecialchars($related['image_url']); ?>" 
                                  alt="<?php echo htmlspecialchars($related['title']); ?>" 
                                  class="product-image">
                         </a>
                         <div class="product-info">
-                            <span class="product-category"><?php echo htmlspecialchars($related['category']); ?></span>
+                            <span class="product-category"><?php echo htmlspecialchars($related['category_name']); ?></span>
                             <h3 class="product-title">
                                 <a href="<?php echo BASE_URL; ?>/pages/product.php?id=<?php echo $related['id']; ?>" class="product-title-link">
                                     <?php echo htmlspecialchars($related['title']); ?>
