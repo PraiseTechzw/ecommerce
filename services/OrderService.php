@@ -5,7 +5,7 @@ class OrderService {
     private $pdo;
 
     public function __construct() {
-        $db = Database::getInstance();
+        $db = new Database();
         $this->pdo = $db->getConnection();
     }
 
